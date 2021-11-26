@@ -1,4 +1,29 @@
 # ChangeLog
+## [3.1.3]
+- Fix navigateNamedTo does not update the stack #831
+- Refactor navigation history and set kept history records to 20 entries max
+## [3.1.2]
+- Fix Bad state: No element exception when setting initialRoutes #826
+- Fix conflict when param name is 'name' #824
+## [3.1.1]
+- Fix Regression bug (caused by immutable pendingRoutes list) #822
+## [3.1.0]
+- Prefer previous-current route index as new current index when updating tab routes #797
+- Improve native navigation history
+- Use browser history as navigation history in web
+- Fix path/query params not updating issue #809
+- Fix generic nullable types are generated as non-nullables #811
+- Override toString method inside of generated arg classes [FR] #820
+- Support redirect paths with path params [FR] #818
+- Fix replace/replaceNamed/replaceAll do not replace current url in browser #781
+
+## [3.0.4]
+- Fix IndexedStack widgets are not updated on tabs routes change.
+- Fix RangeError when updating routes in AutoTabsScaffold #788
+## [3.0.3]
+- Fix dynamic routes for AutoTabsScaffold don't work #783
+## [3.0.2]
+- Make AutoTabsScaffold builders rebuild on global routes hierarchy changes
 ## [3.0.1]
 - Fix conflict with source_gen:combining_builder by using .gr.dart instead of .g.dart
 ## [3.0.0] 

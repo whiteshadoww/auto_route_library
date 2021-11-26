@@ -2,16 +2,42 @@ import 'package:auto_route/auto_route.dart';
 import 'package:example/mobile/router/router.gr.dart';
 import 'package:flutter/material.dart';
 
-class SettingsPage extends StatefulWidget {
+import 'home_page.dart';
+
+class SettingsPage extends StatelessWidget {
+  final String tab;
+  final String query;
+  SettingsPage({
+    Key? key,
+    @pathParam required this.tab,
+    @queryParam this.query = 'none',
+  }) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(tab),
+            Text(query),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class Settings2Page extends StatefulWidget {
   final String tab;
 
-  SettingsPage({Key? key, @pathParam required this.tab}) : super(key: key);
+  Settings2Page({Key? key, @pathParam required this.tab}) : super(key: key);
 
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> with AutoRouteAware {
+class _SettingsPageState extends State<Settings2Page> with AutoRouteAware {
   var _count = 0;
 
   @override
@@ -44,8 +70,6 @@ class _SettingsPageState extends State<SettingsPage> with AutoRouteAware {
 
   @override
   Widget build(BuildContext context) {
-    print('------ building SettingsPage');
-
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -54,23 +78,23 @@ class _SettingsPageState extends State<SettingsPage> with AutoRouteAware {
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
-              // setState(() {
-              //   _count++;
-              // });
-
-              // context.navigateNamedTo(
-              //   'profile/my-books?filter=yedds',
-              //   includePrefixMatches: true,
-              // );
               context.navigateTo(
                 ProfileTab(children: [
-                  ProfileRoute(),
                   MyBooksRoute(),
                 ]),
               );
             },
             child: Text('navigateNamed to profile/my-books'),
-          )
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {
+              context
+                  .findRootAncestorStateOfType<HomePageState>()
+                  ?.toggleSettingsTap();
+            },
+            child: Text('Toggle Settings Tab'),
+          ),
         ],
       ),
     );

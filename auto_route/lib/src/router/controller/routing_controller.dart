@@ -8,62 +8,96 @@ import 'package:auto_route/src/route/route_data_scope.dart';
 import 'package:auto_route/src/router/auto_route_page.dart';
 import 'package:auto_route/src/router/controller/pageless_routes_observer.dart';
 import 'package:auto_route/src/router/transitions/custom_page_route.dart';
-import 'package:collection/collection.dart' show ListEquality;
+import 'package:auto_route/src/router/widgets/auto_route_navigator.dart';
+import 'package:collection/collection.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:path/path.dart' as p;
+import 'package:universal_html/html.dart' as html;
 
 import '../../utils.dart';
-import 'navigation_history.dart';
 
 part '../../route/route_data.dart';
 part 'auto_route_guard.dart';
+part 'auto_router_delegate.dart';
+part 'navigation_history.dart';
+part 'root_stack_router.dart';
 
 typedef RouteDataPredicate = bool Function(RouteData route);
 typedef OnNestedNavigateCallBack = void Function(
     List<RouteMatch> routes, bool initial);
 typedef OnTabNavigateCallBack = void Function(RouteMatch route, bool initial);
+typedef RoutesBuilder = List<PageRouteInfo> Function(BuildContext context);
+typedef RoutePopCallBack = void Function(RouteMatch route, dynamic results);
+typedef OnNavigateCallBack = void Function(UrlState tree, bool initial);
+typedef NavigatorObserversBuilder = List<NavigatorObserver> Function();
 
 abstract class RoutingController with ChangeNotifier {
   final Map<LocalKey, RoutingController> childControllers = {};
+
   final List<AutoRoutePage> _pages = [];
+
+  NavigationHistory get navigationHistory => root.navigationHistory;
+
+  void markUrlStateForReplace() => navigationHistory.markUrlStateForReplace();
 
   void attachChildController(RoutingController childController) {
     childControllers[childController.routeData.key] = childController;
   }
 
   void removeChildController(RoutingController childController) {
-    childControllers.remove(childController.routeData.key);
+    // childController must have the same key and  instance
+    if (childController == childControllers[childController.key]) {
+      childControllers.remove(childController.key);
+    }
   }
 
   List<RouteData> get stackData =>
       List.unmodifiable(_pages.map((e) => e.routeData));
 
   bool isRouteActive(String routeName) {
-    return root._isRouteActive(routeName);
+    return navigationHistory.isRouteActive(routeName);
   }
 
-  bool _isRouteActive(String routeName) {
-    return currentSegments.any(
-      (r) => r.name == routeName,
-    );
+  bool isRouteKeyActive(Key key) {
+    return navigationHistory.isRouteKeyActive(key);
+  }
+
+  bool isPathActive(String path) {
+    return navigationHistory.isPathActive(path);
   }
 
   RouteData _createRouteData(RouteMatch route, RouteData parent) {
+    final mayUpdateController = childControllers[route.key];
+
+    var pendingChildren = <RouteMatch>[];
+    if (mayUpdateController == null && route.hasChildren) {
+      pendingChildren = route.children!;
+    }
     final routeData = RouteData(
       route: route,
       router: this,
       parent: parent,
-      pendingChildren: route.children ?? [],
+      pendingChildren: pendingChildren,
     );
 
-    final mayUpdateController = childControllers[routeData.key];
     if (mayUpdateController != null) {
       mayUpdateController._updateRouteDate(routeData);
     }
 
     return routeData;
+  }
+
+  void _maybeNotifyRoot() {
+    if (!isRoot) {
+      root.notifyListeners();
+    }
+    if (!isRouteKeyActive(current.key) && !current._match.hasEmptyPath) {
+      navigationHistory.rebuildUrl();
+    }
+    ;
   }
 
   RouteMatch? _matchOrReportFailure(
@@ -103,15 +137,6 @@ abstract class RoutingController with ChangeNotifier {
   }
 
   bool get managedByWidget;
-
-  bool isPathActive(String path) {
-    return root._isPathActive(path);
-  }
-
-  bool _isPathActive(String pattern) {
-    return RegExp(pattern)
-        .hasMatch(p.joinAll(currentSegments.map((e) => e.stringMatch)));
-  }
 
   bool _canHandleNavigation(PageRouteInfo route) {
     return routeCollection.containsKey(route.routeName);
@@ -231,25 +256,13 @@ abstract class RoutingController with ChangeNotifier {
 
   bool get canNavigateBack => navigationHistory.canNavigateBack;
 
-  bool navigateBack() {
-    if (canNavigateBack) {
-      navigationHistory.removeLast();
-      root._navigateAll([navigationHistory.currentEntry]);
-      return true;
-    }
-    return false;
-  }
-
-  NavigationHistory get navigationHistory;
+  void navigateBack() => navigationHistory.back();
 
   StackRouter get root => (_parent?.root ?? this) as StackRouter;
 
   StackRouter? get parentAsStackRouter => parent<StackRouter>();
 
   bool get isRoot => _parent == null;
-
-  @Deprecated('use topMostRouter() instead')
-  RoutingController get topMost;
 
   RoutingController topMostRouter({bool ignorePagelessRoutes = false});
 
@@ -273,7 +286,7 @@ abstract class RoutingController with ChangeNotifier {
     if (childControllers.isEmpty) {
       return null;
     }
-    return childControllers.values.whereType<T>().lastOrNull(
+    return childControllers.values.whereType<T>().lastWhereOrNull(
           ((c) => c.routeData.name == routeName),
         );
   }
@@ -340,17 +353,7 @@ class TabsRouter extends RoutingController {
         _parent = parent,
         _routeData = routeData {
     if (parent != null) {
-      var hasPendingSubNavigation = routeData.hasPendingChildren &&
-          routeData.pendingChildren.last.hasChildren;
-      addListener(
-        () {
-          if (!hasPendingSubNavigation) {
-            root.notifyListeners();
-          } else {
-            hasPendingSubNavigation = false;
-          }
-        },
-      );
+      addListener(_maybeNotifyRoot);
     }
   }
 
@@ -397,9 +400,6 @@ class TabsRouter extends RoutingController {
   }
 
   @override
-  RoutingController get topMost => topMostRouter();
-
-  @override
   RoutingController topMostRouter({bool ignorePagelessRoutes = false}) {
     var activeKey = _activePage?.routeData.key;
     if (childControllers.containsKey(activeKey)) {
@@ -441,6 +441,7 @@ class TabsRouter extends RoutingController {
         _activeIndex = correspondingRouteIndex;
       }
     }
+
     if (routesToPush.isNotEmpty) {
       _pushAll(routesToPush);
     }
@@ -454,10 +455,20 @@ class TabsRouter extends RoutingController {
     }
   }
 
-  void replaceAll(List<PageRouteInfo> routes) {
+  void replaceAll(
+      List<PageRouteInfo> routes, PageRouteInfo<dynamic> previousActiveRoute) {
     final routesToPush = _matchAllOrReportFailure(routes)!;
+
     _pages.clear();
+    childControllers.clear();
     _pushAll(routesToPush);
+    var targetIndex =
+        routesToPush.indexWhere((r) => r.name == previousActiveRoute.routeName);
+    if (targetIndex == -1) {
+      targetIndex = homeIndex == -1 ? 0 : homeIndex;
+    }
+
+    setActiveIndex(targetIndex, notify: false);
   }
 
   @override
@@ -471,13 +482,16 @@ class TabsRouter extends RoutingController {
       );
 
       if (pageToUpdateIndex != -1) {
+        final data = _createRouteData(mayUpdateRoute, routeData);
+        _pages[pageToUpdateIndex] = pageBuilder(data);
+
         if (!managedByWidget) {
           setActiveIndex(pageToUpdateIndex);
         } else if (onNavigate != null) {
           onNavigate!(mayUpdateRoute, false);
         }
-        var mayUpdateController = childControllers[mayUpdateRoute.key];
 
+        var mayUpdateController = childControllers[mayUpdateRoute.key];
         if (mayUpdateController != null) {
           final newRoutes = mayUpdateRoute.children ?? const [];
           if (mayUpdateController.managedByWidget) {
@@ -485,9 +499,6 @@ class TabsRouter extends RoutingController {
           }
           return mayUpdateController._navigateAll(newRoutes,
               onFailure: onFailure);
-        } else {
-          final data = _createRouteData(mayUpdateRoute, routeData);
-          _pages[pageToUpdateIndex] = pageBuilder(data);
         }
       }
       _updateSharedPathData(
@@ -545,9 +556,6 @@ class TabsRouter extends RoutingController {
       onNavigate?.call(routes.last, initial);
     }
   }
-
-  @override
-  NavigationHistory get navigationHistory => root.navigationHistory;
 }
 
 abstract class StackRouter extends RoutingController {
@@ -563,31 +571,19 @@ abstract class StackRouter extends RoutingController {
     GlobalKey<NavigatorState>? navigatorKey,
   })  : _navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
         _parent = parent {
-    if (parent != null) {
-      var hasPendingSubNavigation = routeData.hasPendingChildren &&
-          routeData.pendingChildren.last.hasChildren;
-      addListener(
-        () {
-          if (!hasPendingSubNavigation) {
-            root.notifyListeners();
-          } else {
-            hasPendingSubNavigation = false;
-          }
-        },
-      );
-    }
-    pagelessRoutesObserver.addListener(notifyListeners);
+    addListener(_maybeNotifyRoot);
   }
 
-  Map<AutoRedirectGuard, VoidCallback> _redirectGuardsListeners = {};
+  Map<AutoRedirectGuardBase, VoidCallback> _redirectGuardsListeners = {};
 
-  void _attachRedirectGuard(AutoRedirectGuard guard) {
+  void _attachRedirectGuard(AutoRedirectGuardBase guard) {
     final stackRouters = _buildRoutersHierarchy().whereType<StackRouter>();
 
     if (stackRouters
         .any((r) => r._redirectGuardsListeners.containsKey(guard))) {
       return;
     }
+
     guard.addListener(
       _redirectGuardsListeners[guard] = () {
         guard._reevaluate(this);
@@ -595,7 +591,7 @@ abstract class StackRouter extends RoutingController {
     );
   }
 
-  void _removeRedirectGuard(AutoRedirectGuard guard) {
+  void _removeRedirectGuard(AutoRedirectGuardBase guard) {
     guard.removeListener(_redirectGuardsListeners[guard]!);
     _redirectGuardsListeners.remove(guard);
   }
@@ -609,14 +605,13 @@ abstract class StackRouter extends RoutingController {
         guard.dispose();
       },
     );
-    pagelessRoutesObserver.removeListener(notifyListeners);
     pagelessRoutesObserver.dispose();
   }
 
   @override
   int get stateHash => super.stateHash ^ hasPagelessTopRoute.hashCode;
 
-  late final pagelessRoutesObserver = PagelessRoutesObserver();
+  final pagelessRoutesObserver = PagelessRoutesObserver();
 
   GlobalKey<NavigatorState> get navigatorKey => _navigatorKey;
 
@@ -638,9 +633,7 @@ abstract class StackRouter extends RoutingController {
   }
 
   @override
-  RouteData get current {
-    return currentChild ?? routeData;
-  }
+  RouteData get current => currentChild ?? routeData;
 
   @override
   RouteData? get currentChild {
@@ -691,9 +684,6 @@ abstract class StackRouter extends RoutingController {
     }
     return this;
   }
-
-  @override
-  RoutingController get topMost => topMostRouter();
 
   @override
   RouteData get topRoute => topMostRouter(ignorePagelessRoutes: true).current;
@@ -780,10 +770,7 @@ abstract class StackRouter extends RoutingController {
   bool _removeLast({bool notify = true}) {
     var didRemove = false;
     if (_pages.isNotEmpty) {
-      removeRoute(_pages.last.routeData);
-      if (notify) {
-        notifyListeners();
-      }
+      removeRoute(_pages.last.routeData, notify: notify);
       didRemove = true;
     }
     return didRemove;
@@ -811,7 +798,7 @@ abstract class StackRouter extends RoutingController {
   Future<dynamic> _popUntilOrPushAll(List<RouteMatch> routes,
       {OnNavigationFailure? onFailure}) async {
     final anchor = routes.first;
-    final anchorPage = _pages.lastOrNull(
+    final anchorPage = _pages.lastWhereOrNull(
       (p) => p.routeKey == anchor.key,
     );
     if (anchorPage != null) {
@@ -831,6 +818,7 @@ abstract class StackRouter extends RoutingController {
       onFailure: onFailure,
       updateAncestorsPathData: false,
       returnLastRouteCompleter: false,
+      // notify: currentRoute.key != routes.last.key,
     );
   }
 
@@ -865,7 +853,8 @@ abstract class StackRouter extends RoutingController {
     OnNavigationFailure? onFailure,
   }) {
     final scope = _findStackScope(route);
-    scope.removeLast();
+    scope._removeLast(notify: false);
+    markUrlStateForReplace();
     return scope._push<T>(route, onFailure: onFailure);
   }
 
@@ -894,6 +883,7 @@ abstract class StackRouter extends RoutingController {
   }) {
     final scope = _findStackScope(routes.first);
     scope._pages.clear();
+    markUrlStateForReplace();
     return scope._pushAll(routes, onFailure: onFailure);
   }
 
@@ -960,6 +950,13 @@ abstract class StackRouter extends RoutingController {
       final data = _createRouteData(match, routeData);
       _pages.add(pageBuilder(data));
     }
+
+    navigationHistory._onNewUrlState(
+      UrlState.fromSegments(
+        root.currentSegments,
+        shouldReplace: current == routeData,
+      ),
+    );
   }
 
   Future<void> _pushAll(
@@ -992,9 +989,10 @@ abstract class StackRouter extends RoutingController {
       if (await _canNavigate(
         route,
         onFailure,
-        pendingRoutes: routes.toList()..removeAt(i),
+        pendingRoutes:
+            routes.whereIndexed((index, element) => index > i).toList(),
       )) {
-        if (i != routes.length - 1) {
+        if (i != (routes.length - 1)) {
           _addEntry(route, notify: false);
         } else {
           _updateSharedPathData(
@@ -1002,7 +1000,7 @@ abstract class StackRouter extends RoutingController {
             fragment: route.fragment,
             includeAncestors: updateAncestorsPathData,
           );
-          var completer = _addEntry<T>(route, notify: true);
+          final completer = _addEntry<T>(route, notify: notify);
           if (returnLastRouteCompleter) {
             return completer;
           }
@@ -1010,9 +1008,6 @@ abstract class StackRouter extends RoutingController {
       } else {
         break;
       }
-    }
-    if (notify) {
-      notifyListeners();
     }
     return SynchronousFuture(null);
   }
@@ -1040,8 +1035,12 @@ abstract class StackRouter extends RoutingController {
     }
     for (var guard in route.guards) {
       final completer = Completer<bool>();
+      if (guard is AutoRedirectGuard) {
+        _attachRedirectGuard(guard);
+      }
       guard.onNavigation(
           NavigationResolver(
+            this,
             completer,
             route,
             pendingRoutes: pendingRoutes,
@@ -1055,8 +1054,6 @@ abstract class StackRouter extends RoutingController {
           _removeRedirectGuard(guard);
         }
         return false;
-      } else if (guard is AutoRedirectGuard) {
-        _attachRedirectGuard(guard);
       }
     }
     return true;
@@ -1076,7 +1073,7 @@ abstract class StackRouter extends RoutingController {
   }) async {
     if (routes.isNotEmpty) {
       if (!managedByWidget) {
-        await _popUntilOrPushAll(routes, onFailure: onFailure);
+        _popUntilOrPushAll(routes, onFailure: onFailure);
       }
       final mayUpdateRoute = routes.last;
       final mayUpdateController = childControllers[mayUpdateRoute.key];
@@ -1086,6 +1083,7 @@ abstract class StackRouter extends RoutingController {
         if (mayUpdateController.managedByWidget) {
           mayUpdateController._onNavigate(newChildren, false);
         }
+
         return mayUpdateController._navigateAll(
           newChildren,
           onFailure: onFailure,
@@ -1125,7 +1123,8 @@ abstract class StackRouter extends RoutingController {
       onFailure: onFailure,
     );
     if (scope != null) {
-      scope.router.removeLast();
+      scope.router._removeLast(notify: false);
+      markUrlStateForReplace();
       return scope.router._pushAllGuarded(
         scope.matches,
         onFailure: onFailure,
@@ -1198,25 +1197,27 @@ class NestedStackRouter extends StackRouter {
   @override
   void _updateRouteDate(RouteData data) {
     _routeData = data;
-    for (var page in _pages) {
+    for (final page in _pages) {
       page.routeData._updateParentData(data);
     }
   }
 
   void _pushInitialRoutes() async {
     if (_routeData.hasPendingChildren) {
-      final initialRoutes = _routeData.pendingChildren;
+      final initialRoutes = List<RouteMatch>.unmodifiable(
+        _routeData.pendingChildren,
+      );
       if (managedByWidget) {
         onNavigate?.call(initialRoutes, true);
       } else {
-        await _pushAllGuarded(initialRoutes);
+        _pushAllGuarded(
+          initialRoutes,
+          returnLastRouteCompleter: false,
+        );
       }
     }
     _routeData.pendingChildren.clear();
   }
-
-  @override
-  NavigationHistory get navigationHistory => root.navigationHistory;
 }
 
 class _RouterScopeResult<T extends RoutingController> {

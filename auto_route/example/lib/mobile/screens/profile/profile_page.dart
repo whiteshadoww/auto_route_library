@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:example/mobile/screens/home_page.dart';
 import 'package:flutter/material.dart';
 
 import '../../router/router.gr.dart';
@@ -11,11 +12,10 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   UserData? userData;
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Center(
+    return Scaffold(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -28,7 +28,16 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: () {
                 context.router.push(MyBooksRoute());
               },
-              child: Text('My Books'),
+              child: Text('My Books '),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () {
+                context
+                    .findRootAncestorStateOfType<HomePageState>()
+                    ?.toggleSettingsTap();
+              },
+              child: Text('Toggle Settings Tab'),
             ),
             const SizedBox(height: 32),
             ElevatedButton(
@@ -36,6 +45,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 context.navigateBack();
               },
               child: Text('Navigate Back'),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () {
+                context.navigateNamedTo('settings/tab1');
+              },
+              child: Text('Navigate to settings/tab1'),
             ),
             const SizedBox(height: 32),
             userData == null

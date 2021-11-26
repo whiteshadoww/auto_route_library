@@ -9,7 +9,7 @@ class HomePage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _HomePageState createState() => _HomePageState();
+  HomePageState createState() => HomePageState();
 }
 
 class RouteDestination {
@@ -24,7 +24,7 @@ class RouteDestination {
   });
 }
 
-class _HomePageState extends State<HomePage> {
+class HomePageState extends State<HomePage> {
   final destinations = [
     RouteDestination(
       route: BooksTab(),
@@ -43,12 +43,18 @@ class _HomePageState extends State<HomePage> {
     ),
   ];
 
+  void toggleSettingsTap() => setState(() {
+        _showSettingsTap = !_showSettingsTap;
+      });
+
+  bool _showSettingsTap = true;
+
   @override
   Widget build(context) {
     // builder will rebuild everytime this router's stack
     // updates
     // we need it to indicate which NavigationRailDestination is active
-    return kIsWeb
+    return kIsWeb && false
         ? AutoRouter(builder: (context, child) {
             // we check for active route index by using
             // router.isRouteActive method
@@ -85,20 +91,21 @@ class _HomePageState extends State<HomePage> {
             homeIndex: 0,
             appBarBuilder: (context, tabsRouter) {
               return AppBar(
-                  title: Text(context.topRoute.name),
-                  leading: AutoBackButton());
+                title: Text(tabsRouter.topRoute.name),
+                leading: AutoBackButton(),
+              );
             },
             routes: [
               BooksTab(),
               ProfileTab(),
-              SettingsTab(tab: 'default'),
+              if (_showSettingsTap) SettingsTab(tab: 'default'),
             ],
             bottomNavigationBuilder: buildBottomNav,
           );
   }
 
   Widget buildBottomNav(BuildContext context, TabsRouter tabsRouter) {
-    final hideBottomNav = context.topRouteMatch.meta['hideBottomNav'] == true;
+    final hideBottomNav = tabsRouter.topMatch.meta['hideBottomNavf'] == true;
     return hideBottomNav
         ? SizedBox.shrink()
         : BottomNavigationBar(
@@ -113,10 +120,11 @@ class _HomePageState extends State<HomePage> {
                 icon: Icon(Icons.person),
                 label: 'Profile',
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
+              if (_showSettingsTap)
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings),
+                  label: 'Settings',
+                ),
             ],
           );
   }

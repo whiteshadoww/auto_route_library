@@ -37,7 +37,7 @@ class PageRouteInfo<T> {
     if (_stringMatch != null) {
       return _stringMatch!;
     }
-    return _expand(path, rawPathParams);
+    return expandPath(path, rawPathParams);
   }
 
   String get fullPath =>
@@ -54,7 +54,7 @@ class PageRouteInfo<T> {
   @deprecated
   Map<String, dynamic> get params => rawPathParams;
 
-  static String _expand(String template, Map<String, dynamic> params) {
+  static String expandPath(String template, Map<String, dynamic> params) {
     if (mapNullOrEmpty(params)) {
       return template;
     }
@@ -113,14 +113,16 @@ class PageRouteInfo<T> {
       redirectedFrom: match.redirectedFrom,
       stringMatch: match.stringMatch,
       args: match.args,
-      initialChildren:
-          match.children?.map((m) => PageRouteInfo.fromMatch(m)).toList(),
+      initialChildren: match.children
+          ?.map(
+            (m) => PageRouteInfo.fromMatch(m),
+          )
+          .toList(),
     );
   }
 
-// maybe?
-  Future<void> show(BuildContext context) {
-    return context.router.push(this);
+  Future<T?> show<T>(BuildContext context) {
+    return context.router.push<T>(this);
   }
 
   @override

@@ -12,13 +12,12 @@ class _BookListPageState extends State<BookListPage> {
   @override
   Widget build(BuildContext context) {
     var booksDb = BooksDBProvider.of(context);
-    return ListView(
-      children: booksDb?.books
-              .map((book) => Column(
-                    children: [
-                      Hero(
-                        tag: 'Hero${book.id}',
-                        child: Card(
+    return Scaffold(
+      body: ListView(
+        children: booksDb?.books
+                .map((book) => Column(
+                      children: [
+                        Card(
                           margin: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
                           child: ListTile(
@@ -29,11 +28,11 @@ class _BookListPageState extends State<BookListPage> {
                             },
                           ),
                         ),
-                      ),
-                    ],
-                  ))
-              .toList() ??
-          const [],
+                      ],
+                    ))
+                .toList() ??
+            const [],
+      ),
     );
   }
 }

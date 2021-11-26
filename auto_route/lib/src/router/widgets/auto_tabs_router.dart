@@ -89,6 +89,7 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
   late RoutingController _parentController;
 
   TabsRouter? get controller => _controller;
+  late int _tabsHash;
 
   @override
   void initState() {
@@ -103,6 +104,7 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
       ),
     );
     super.initState();
+    _tabsHash = ListEquality().hash(widget.routes);
   }
 
   late List<NavigatorObserver> _navigatorObservers;
@@ -113,7 +115,7 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
     super.didChangeDependencies();
     final parentRoute = RouteDataScope.of(context);
     if (_controller == null) {
-      final parentScope = RouterScope.of(context);
+      final parentScope = RouterScope.of(context, watch: true);
       _inheritableObserversBuilder = () {
         var observers = widget.navigatorObservers();
         if (!widget.inheritNavigatorObservers) {
@@ -171,7 +173,11 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
   void didUpdateWidget(covariant AutoTabsRouter oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!ListEquality().equals(widget.routes, oldWidget.routes)) {
-      _controller!.replaceAll(widget.routes);
+      _controller!.replaceAll(widget.routes, oldWidget.routes[_index]);
+      _tabsHash = ListEquality().hash(widget.routes);
+      setState(() {
+        _index = _controller!.activeIndex;
+      });
     }
     if (widget.declarative && widget._activeIndex != oldWidget._activeIndex) {
       _animationController.value = 1.0;
@@ -194,6 +200,7 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
         ? Container(color: Theme.of(context).scaffoldBackgroundColor)
         : _IndexedStackBuilder(
             activeIndex: _index,
+            tabsHash: _tabsHash,
             lazyLoad: widget.lazyLoad,
             navigatorObservers: _navigatorObservers,
             itemBuilder: (BuildContext context, int index) {
@@ -202,20 +209,22 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
             stack: stack,
           );
     var stateHash = controller!.stateHash;
+
     return RouterScope(
       controller: _controller!,
       inheritableObserversBuilder: _inheritableObserversBuilder,
       stateHash: stateHash,
       navigatorObservers: _navigatorObservers,
       child: TabsRouterScope(
-          controller: _controller!,
-          stateHash: stateHash,
-          child: AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) =>
-                builder(context, child ?? builderChild, _animation),
-            child: builderChild,
-          )),
+        controller: _controller!,
+        stateHash: stateHash,
+        child: AnimatedBuilder(
+          animation: _animation,
+          builder: (context, child) =>
+              builder(context, child ?? builderChild, _animation),
+          child: builderChild,
+        ),
+      ),
     );
   }
 
@@ -225,12 +234,6 @@ class AutoTabsRouterState extends State<AutoTabsRouter>
 }
 
 class _IndexedStackBuilder extends StatefulWidget {
-  final int activeIndex;
-  final IndexedWidgetBuilder itemBuilder;
-  final bool lazyLoad;
-  final List<AutoRoutePage> stack;
-  final List<NavigatorObserver> navigatorObservers;
-
   const _IndexedStackBuilder({
     Key? key,
     required this.activeIndex,
@@ -238,7 +241,15 @@ class _IndexedStackBuilder extends StatefulWidget {
     required this.navigatorObservers,
     required this.stack,
     required this.lazyLoad,
+    required this.tabsHash,
   }) : super(key: key);
+
+  final int activeIndex;
+  final IndexedWidgetBuilder itemBuilder;
+  final bool lazyLoad;
+  final List<AutoRoutePage> stack;
+  final List<NavigatorObserver> navigatorObservers;
+  final int tabsHash;
 
   @override
   _IndexedStackBuilderState createState() => _IndexedStackBuilderState();
@@ -280,6 +291,10 @@ class _IndexedStackBuilderState extends State<_IndexedStackBuilder> {
   @override
   void initState() {
     super.initState();
+    _setup();
+  }
+
+  void _setup() {
     for (var i = 0; i < widget.stack.length; ++i) {
       if (i == widget.activeIndex || !widget.lazyLoad) {
         _initializedPagesTracker[i] = true;
@@ -293,8 +308,13 @@ class _IndexedStackBuilderState extends State<_IndexedStackBuilder> {
   @override
   void didUpdateWidget(_IndexedStackBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.tabsHash != oldWidget.tabsHash) {
+      _initializedPagesTracker.clear();
+      _setup();
+      return;
+    }
     if (widget.lazyLoad &&
-        _initializedPagesTracker[widget.activeIndex] == false) {
+        _initializedPagesTracker[widget.activeIndex] != true) {
       _initializedPagesTracker[widget.activeIndex] = true;
       _didInitTabRoute(widget.activeIndex, oldWidget.activeIndex);
     } else if (widget.activeIndex != oldWidget.activeIndex) {
@@ -303,16 +323,19 @@ class _IndexedStackBuilderState extends State<_IndexedStackBuilder> {
   }
 
   @override
-  Widget build(BuildContext context) => IndexedStack(
-        index: widget.activeIndex,
-        sizing: StackFit.expand,
-        children: List.generate(
-          widget.stack.length,
-          (index) {
-            return _initializedPagesTracker[index] == true
-                ? widget.itemBuilder(context, index)
-                : _dummyWidget;
-          },
-        ),
-      );
+  Widget build(BuildContext context) {
+    return IndexedStack(
+      key: ValueKey(widget.tabsHash),
+      index: widget.activeIndex,
+      sizing: StackFit.expand,
+      children: List.generate(
+        widget.stack.length,
+        (index) {
+          return _initializedPagesTracker[index] == true
+              ? widget.itemBuilder(context, index)
+              : _dummyWidget;
+        },
+      ),
+    );
+  }
 }
