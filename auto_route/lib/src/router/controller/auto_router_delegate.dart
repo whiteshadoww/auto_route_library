@@ -27,6 +27,7 @@ class AutoRouterDelegate extends RouterDelegate<UrlState> with ChangeNotifier {
           RouteInformation(
             location: url,
           ),
+          type: RouteInformationReportingType.navigate,
         );
   }
 
@@ -51,6 +52,7 @@ class AutoRouterDelegate extends RouterDelegate<UrlState> with ChangeNotifier {
     RootStackRouter controller, {
     required RoutesBuilder routes,
     String? navRestorationScopeId,
+    String? initialDeepLink,
     RoutePopCallBack? onPopRoute,
     OnNavigateCallBack? onNavigate,
     NavigatorObserversBuilder navigatorObservers,
@@ -62,7 +64,7 @@ class AutoRouterDelegate extends RouterDelegate<UrlState> with ChangeNotifier {
   UrlState? get currentConfiguration => urlState;
 
   @override
-  Future<void> setInitialRoutePath(UrlState state) {
+  Future<void> setInitialRoutePath(UrlState configuration) {
     // setInitialRoutePath is re-fired on enabling
     // select widget mode from flutter inspector,
     // this check is preventing it from rebuilding the app
@@ -74,24 +76,24 @@ class AutoRouterDelegate extends RouterDelegate<UrlState> with ChangeNotifier {
       return controller.pushAll(initialRoutes!);
     } else if (initialDeepLink != null) {
       return controller.pushNamed(initialDeepLink!, includePrefixMatches: true);
-    } else if (state.hasSegments) {
-      _onNewUrlState(state);
-      return controller.navigateAll(state.segments);
+    } else if (configuration.hasSegments) {
+      _onNewUrlState(configuration);
+      return controller.navigateAll(configuration.segments);
     } else {
       throw FlutterError("Can not resolve initial route");
     }
   }
 
   @override
-  Future<void> setNewRoutePath(UrlState state) {
+  Future<void> setNewRoutePath(UrlState configuration) {
     final topMost = controller.topMostRouter();
     if (topMost is StackRouter && topMost.hasPagelessTopRoute) {
       topMost.popUntil((route) => route.settings is Page);
     }
 
-    if (state.hasSegments) {
-      _onNewUrlState(state);
-      return controller.navigateAll(state.segments);
+    if (configuration.hasSegments) {
+      _onNewUrlState(configuration);
+      return controller.navigateAll(configuration.segments);
     }
 
     notifyListeners();
@@ -131,7 +133,7 @@ class AutoRouterDelegate extends RouterDelegate<UrlState> with ChangeNotifier {
 }
 
 class _AutoRootRouter extends StatefulWidget {
-  _AutoRootRouter({
+  const _AutoRootRouter({
     Key? key,
     required this.router,
     this.navRestorationScopeId,
@@ -205,6 +207,7 @@ class _DeclarativeAutoRouterDelegate extends AutoRouterDelegate {
     RootStackRouter router, {
     required this.routes,
     String? navRestorationScopeId,
+    String? initialDeepLink,
     this.onPopRoute,
     this.onNavigate,
     NavigatorObserversBuilder navigatorObservers =
@@ -213,13 +216,21 @@ class _DeclarativeAutoRouterDelegate extends AutoRouterDelegate {
           router,
           navRestorationScopeId: navRestorationScopeId,
           navigatorObservers: navigatorObservers,
+          initialDeepLink: initialDeepLink,
         ) {
     router._managedByWidget = true;
   }
 
   @override
   Future<void> setInitialRoutePath(UrlState tree) {
-    return _onNavigate(tree, true);
+    if (initialDeepLink != null) {
+      final routes = controller.buildPageRoutesStack(initialDeepLink!);
+      controller.pendingRoutesHandler._setPendingRoutes(routes);
+    } else if (tree.hasSegments) {
+      final routes = tree.segments.map((e) => e.toPageRouteInfo()).toList();
+      controller.pendingRoutesHandler._setPendingRoutes(routes);
+    }
+    return SynchronousFuture(null);
   }
 
   @override
@@ -227,12 +238,12 @@ class _DeclarativeAutoRouterDelegate extends AutoRouterDelegate {
     return _onNavigate(tree);
   }
 
-  Future<void> _onNavigate(UrlState tree, [bool initial = false]) {
+  Future<void> _onNavigate(UrlState tree) {
     if (tree.hasSegments) {
       controller.navigateAll(tree.segments);
     }
     if (onNavigate != null) {
-      onNavigate!(tree, true);
+      onNavigate!(tree);
     }
 
     return SynchronousFuture(null);
@@ -258,26 +269,5 @@ class _DeclarativeAutoRouterDelegate extends AutoRouterDelegate {
         ),
       ),
     );
-  }
-}
-
-class SimpleRouterDelegate extends RouterDelegate with ChangeNotifier {
-  final WidgetBuilder builder;
-
-  SimpleRouterDelegate(this.builder);
-
-  @override
-  Widget build(BuildContext context) {
-    return builder(context);
-  }
-
-  @override
-  Future<bool> popRoute() {
-    return SynchronousFuture(false);
-  }
-
-  @override
-  Future<void> setNewRoutePath(configuration) {
-    throw UnimplementedError();
   }
 }

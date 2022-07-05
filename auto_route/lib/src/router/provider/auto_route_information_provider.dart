@@ -8,6 +8,7 @@ class AutoRouteInformationProvider extends RouteInformationProvider
   ///
   /// Use the [initialRouteInformation] to set the default route information for this
   /// provider.
+
   AutoRouteInformationProvider._(
       {required RouteInformation initialRouteInformation})
       : _value = initialRouteInformation;
@@ -16,9 +17,7 @@ class AutoRouteInformationProvider extends RouteInformationProvider
       {RouteInformation? initialRouteInformation}) {
     final initialRouteInfo = initialRouteInformation ??
         RouteInformation(
-          location: WidgetsBinding.instance?.window.defaultRouteName ??
-              Navigator.defaultRouteName,
-        );
+            location: WidgetsBinding.instance.window.defaultRouteName);
     return AutoRouteInformationProvider._(
       initialRouteInformation: initialRouteInfo,
     );
@@ -26,40 +25,50 @@ class AutoRouteInformationProvider extends RouteInformationProvider
 
   @override
   void routerReportsNewRouteInformation(RouteInformation routeInformation,
-      {bool isNavigation = true}) {
-    var replace = false;
-    if (routeInformation is AutoRouteInformation) {
+      {RouteInformationReportingType type =
+          RouteInformationReportingType.none}) {
+    var replace = type == RouteInformationReportingType.neglect ||
+        (type == RouteInformationReportingType.none &&
+            _valueInEngine.location == routeInformation.location);
+
+    if (!replace && routeInformation is AutoRouteInformation) {
       replace = routeInformation.replace;
     }
+
     SystemNavigator.selectMultiEntryHistory();
     SystemNavigator.routeInformationUpdated(
       location: routeInformation.location!,
       state: routeInformation.state,
-      replace: replace || !isNavigation,
+      replace: replace,
     );
     _value = routeInformation;
+    _valueInEngine = routeInformation;
   }
 
   @override
   RouteInformation get value => _value;
   RouteInformation _value;
 
+  RouteInformation _valueInEngine = RouteInformation(
+      location: WidgetsBinding.instance.window.defaultRouteName);
+
   void _platformReportsNewRouteInformation(RouteInformation routeInformation) {
     if (_value == routeInformation) return;
     _value = routeInformation;
+    _valueInEngine = routeInformation;
     notifyListeners();
   }
 
   @override
   void addListener(VoidCallback listener) {
-    if (!hasListeners) WidgetsBinding.instance!.addObserver(this);
+    if (!hasListeners) WidgetsBinding.instance.addObserver(this);
     super.addListener(listener);
   }
 
   @override
   void removeListener(VoidCallback listener) {
     super.removeListener(listener);
-    if (!hasListeners) WidgetsBinding.instance!.removeObserver(this);
+    if (!hasListeners) WidgetsBinding.instance.removeObserver(this);
   }
 
   @override
@@ -68,7 +77,7 @@ class AutoRouteInformationProvider extends RouteInformationProvider
     // will be added and removed in a coherent fashion such that when the object
     // is no longer being used, there's no listener, and so it will get garbage
     // collected.
-    if (hasListeners) WidgetsBinding.instance!.removeObserver(this);
+    if (hasListeners) WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 

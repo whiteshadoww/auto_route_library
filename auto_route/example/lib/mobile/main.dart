@@ -1,9 +1,8 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:example/data/db.dart';
 import 'package:example/mobile/router/auth_guard.dart';
 import 'package:example/mobile/router/router.gr.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 void main() => runApp(MyApp());
@@ -23,10 +22,17 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      theme: ThemeData.dark(),
-      routerDelegate: _rootRouter.delegate(),
+      theme: ThemeData.dark().copyWith(
+        pageTransitionsTheme: PageTransitionsTheme(builders: {
+          TargetPlatform.iOS: NoShadowCupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        }),
+      ),
+      routerDelegate: _rootRouter.delegate(
+        navigatorObservers: () => [AutoRouteObserver()],
+      ),
       routeInformationProvider: _rootRouter.routeInfoProvider(),
-      routeInformationParser: _rootRouter.defaultRouteParser(),
+      routeInformationParser: _rootRouter.defaultRouteParser(includePrefixMatches: true),
       builder: (_, router) {
         return ChangeNotifierProvider<AuthService>(
           create: (_) => authService,

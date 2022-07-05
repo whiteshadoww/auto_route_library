@@ -15,10 +15,7 @@ class RouteData {
   })  : _match = route,
         _parent = parent;
 
-  List<RouteMatch> get breadcrumbs => List.unmodifiable([
-        if (_parent != null) ..._parent!.breadcrumbs,
-        _match,
-      ]);
+
 
   final List<RouteMatch> pendingChildren;
 
@@ -27,7 +24,7 @@ class RouteData {
   bool get hasPendingChildren => pendingChildren.isNotEmpty;
 
   static RouteData of(BuildContext context) {
-    return RouteDataScope.of(context);
+    return RouteDataScope.of(context).routeData;
   }
 
   bool get hasPendingSubNavigation =>
@@ -74,6 +71,11 @@ class RouteData {
 
   String get match => _match.stringMatch;
 
+  List<RouteMatch> get breadcrumbs => List.unmodifiable([
+    if (_parent != null) ..._parent!.breadcrumbs,
+    _match,
+  ]);
+
   Parameters get inheritedPathParams {
     final params = breadcrumbs.map((e) => e.pathParams).reduce(
           (value, element) => value + element,
@@ -99,30 +101,6 @@ class RouteData {
     if (hasPendingChildren) {
       return _getTopMatch(pendingChildren.last);
     }
-
     return _match;
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is RouteData &&
-          runtimeType == other.runtimeType &&
-          _match == other._match &&
-          _parent == other._parent;
-
-  @override
-  int get hashCode => _match.hashCode ^ _parent.hashCode;
-
-// @override
-  // bool operator ==(Object other) =>
-  //     identical(this, other) ||
-  //     other is RouteData &&
-  //         runtimeType == other.runtimeType &&
-  //         route == other.route;
-  //
-  //
-  //
-  // @override
-  // int get hashCode => route.hashCode;
 }

@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  }) ;
 
   @override
   HomePageState createState() => HomePageState();
@@ -24,7 +24,7 @@ class RouteDestination {
   });
 }
 
-class HomePageState extends State<HomePage> {
+class HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final destinations = [
     RouteDestination(
       route: BooksTab(),
@@ -37,7 +37,7 @@ class HomePageState extends State<HomePage> {
       label: 'Profile',
     ),
     RouteDestination(
-      route: SettingsTab(tab: 'default'),
+      route: SettingsTab(tab: 'tab'),
       icon: Icons.settings,
       label: 'Settings',
     ),
@@ -54,7 +54,7 @@ class HomePageState extends State<HomePage> {
     // builder will rebuild everytime this router's stack
     // updates
     // we need it to indicate which NavigationRailDestination is active
-    return kIsWeb && false
+    return kIsWeb
         ? AutoRouter(builder: (context, child) {
             // we check for active route index by using
             // router.isRouteActive method
@@ -87,25 +87,28 @@ class HomePageState extends State<HomePage> {
               ],
             );
           })
-        : AutoTabsScaffold(
-            homeIndex: 0,
-            appBarBuilder: (context, tabsRouter) {
-              return AppBar(
-                title: Text(tabsRouter.topRoute.name),
-                leading: AutoBackButton(),
-              );
-            },
+        : AutoTabsRouter.pageView(
             routes: [
               BooksTab(),
               ProfileTab(),
-              if (_showSettingsTap) SettingsTab(tab: 'default'),
+              if (_showSettingsTap) SettingsTab(tab: 'tab'),
             ],
-            bottomNavigationBuilder: buildBottomNav,
+            builder: (context, child, animation) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text(context.topRoute.name),
+                  leading: AutoLeadingButton(),
+                ),
+                body: child,
+                bottomNavigationBar:
+                    buildBottomNav(context, context.tabsRouter),
+              );
+            },
           );
   }
 
   Widget buildBottomNav(BuildContext context, TabsRouter tabsRouter) {
-    final hideBottomNav = tabsRouter.topMatch.meta['hideBottomNavf'] == true;
+    final hideBottomNav = tabsRouter.topMatch.meta['hideBottomNav'] == true;
     return hideBottomNav
         ? SizedBox.shrink()
         : BottomNavigationBar(

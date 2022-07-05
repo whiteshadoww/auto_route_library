@@ -1,20 +1,21 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:example/web/router/web_auth_guard.dart';
 import 'package:example/web/web_main.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 // optionally add part directive to use
 // pare builder
 part 'web_router.gr.dart';
 
-@CupertinoAutoRouter(
+@CustomAutoRouter(
+  transitionsBuilder: TransitionsBuilders.noTransition,
   replaceInRouteName: 'Page|Screen,Route',
   routes: <AutoRoute>[
-    AutoRoute(
+    CustomRoute(
       path: '/',
       page: HomePage,
       initial: true,
+      reverseDurationInMilliseconds: 0,
     ),
     AutoRoute(path: '/login', page: LoginPage),
     RedirectRoute(
@@ -23,13 +24,12 @@ part 'web_router.gr.dart';
     ),
     AutoRoute(
       path: '/user/:userID/page',
-      guards: [AuthGuard],
+      // guards: [AuthGuard],
       page: UserPage,
       children: [
         AutoRoute(
-          path: 'profile',
+          path: '',
           page: UserProfilePage,
-          initial: true,
         ),
         AutoRoute(
           path: 'posts',
@@ -59,34 +59,24 @@ class WebAppRouter extends _$WebAppRouter {
   WebAppRouter(
     AuthService authService,
   ) : super(
-          authGuard: AuthGuard(authService),
+          // authGuard: AuthGuard(authService),
         );
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   final VoidCallback? navigate, showUserPosts;
-
   const HomePage({
     Key? key,
     this.navigate,
     this.showUserPosts,
   }) : super(key: key);
 
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: AutoBackButton(),
+        leading: AutoLeadingButton(),
       ),
       body: Center(
         child: Column(
@@ -97,19 +87,15 @@ class _HomePageState extends State<HomePage> {
               style: TextStyle(fontSize: 30),
             ),
             ElevatedButton(
-              onPressed: widget.navigate ??
+              onPressed: navigate ??
                   () {
-                    // context.pushRoute(
-                    //   UserRoute(id: 5, children: [
-                    //     UserProfileRoute(name: 'Name'),
-                    //   ]),
-                    // );
-                    context.navigateNamedTo('/user/2');
+
+                    context.navigateNamedTo('/user/2?query=foo');
                   },
               child: Text('Navigate to user/2'),
             ),
             ElevatedButton(
-              onPressed: widget.showUserPosts,
+              onPressed: showUserPosts,
               child: Text('Show user posts'),
             ),
           ],
@@ -140,6 +126,7 @@ class UserProfilePage extends StatelessWidget {
   final VoidCallback? navigate;
   final int likes;
   final int userId;
+
   const UserProfilePage({
     Key? key,
     this.navigate,
@@ -167,7 +154,7 @@ class UserProfilePage extends StatelessWidget {
               color: Colors.red,
               onPressed: navigate ??
                   () {
-                    context.router.pushNamed('posts');
+                    context.pushRoute(const UserPostsRoute());
                   },
               child: Text('Posts'),
             ),
@@ -225,10 +212,11 @@ class _UserPostsPageState extends State<UserPostsPage> {
 
 class UserPage extends StatefulWidget {
   final int id;
-
+  final String? query;
   UserPage({
     Key? key,
     @PathParam('userID') this.id = -1,
+    @QueryParam() this.query,
   }) : super(key: key);
 
   @override
@@ -236,27 +224,16 @@ class UserPage extends StatefulWidget {
 }
 
 class _UserPageState extends State<UserPage> {
-  late var _id = widget.id;
-
-  @override
-  void didUpdateWidget(covariant UserPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.id != oldWidget.id) {
-      print('User Id changed ${widget.id}');
-      _id = widget.id;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Builder(
           builder: (context) {
-            return Text(context.topRouteMatch.name + ' $_id');
+            return Text(context.topRouteMatch.name + ' ${widget.id} query: ${widget.query}');
           },
         ),
-        leading: AutoBackButton(),
+        leading: AutoLeadingButton(),
       ),
       body: AutoRouter(),
     );

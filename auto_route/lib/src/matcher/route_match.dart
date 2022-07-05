@@ -37,9 +37,6 @@ class RouteMatch<T> {
     this.meta = const {},
   });
 
-  @Deprecated("Renamed to 'name'")
-  String get routeName => name;
-
   bool get hasChildren => children?.isNotEmpty == true;
 
   bool get fromRedirect => redirectedFrom != null;
@@ -71,7 +68,7 @@ class RouteMatch<T> {
     return RouteMatch(
       path: path ?? this.path,
       stringMatch: stringMatch ?? this.stringMatch,
-      name: routeName ?? this.name,
+      name: routeName ?? name,
       segments: segments ?? this.segments,
       children: children ?? this.children,
       pathParams: pathParams ?? this.pathParams,
@@ -95,13 +92,13 @@ class RouteMatch<T> {
           stringMatch == other.stringMatch &&
           pathParams == other.pathParams &&
           key == other.key &&
-          ListEquality().equals(guards, other.guards) &&
+          const ListEquality().equals(guards, other.guards) &&
           queryParams == other.queryParams &&
-          ListEquality().equals(children, other.children) &&
+          const ListEquality().equals(children, other.children) &&
           fragment == other.fragment &&
           redirectedFrom == other.redirectedFrom &&
-          ListEquality().equals(segments, other.segments) &&
-          MapEquality().equals(meta, other.meta);
+          const ListEquality().equals(segments, other.segments) &&
+          const MapEquality().equals(meta, other.meta);
 
   @override
   int get hashCode =>
@@ -123,7 +120,5 @@ class RouteMatch<T> {
     return 'RouteMatch{ routeName: $name, pathParams: $pathParams, queryParams: $queryParams, children: $children, fragment: $fragment, segments: $segments, redirectedFrom: $redirectedFrom,  path: $path, stringMatch: $stringMatch, args: $args, guards: $guards, key: $key}';
   }
 
-  @Deprecated("renamed to 'toPageRouteInfo'")
-  PageRouteInfo toRoute() => toPageRouteInfo();
   PageRouteInfo toPageRouteInfo() => PageRouteInfo.fromMatch(this);
 }

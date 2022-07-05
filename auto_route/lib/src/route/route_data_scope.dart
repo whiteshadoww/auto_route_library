@@ -4,15 +4,14 @@ import '../../auto_route.dart';
 
 class RouteDataScope extends InheritedWidget {
   final RouteData routeData;
-  final int stateHash;
 
   const RouteDataScope({
+    Key? key,
     required this.routeData,
     required Widget child,
-    required this.stateHash,
-  }) : super(child: child);
+  }) : super(child: child, key: key);
 
-  static RouteData of(BuildContext context) {
+  static RouteDataScope of(BuildContext context) {
     var scope = context.findAncestorWidgetOfExactType<RouteDataScope>();
     assert(() {
       if (scope == null) {
@@ -23,11 +22,11 @@ class RouteDataScope extends InheritedWidget {
       }
       return true;
     }());
-    return scope!.routeData;
+    return scope!;
   }
 
   @override
   bool updateShouldNotify(covariant RouteDataScope oldWidget) {
-    return stateHash != oldWidget.stateHash;
+    return routeData.route != oldWidget.routeData.route;
   }
 }

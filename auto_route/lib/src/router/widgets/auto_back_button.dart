@@ -1,9 +1,9 @@
-import 'package:auto_route/src/router/controller/controller_scope.dart';
 import 'package:auto_route/src/router/controller/pageless_routes_observer.dart';
 import 'package:flutter/material.dart';
 
 import '../../../auto_route.dart';
 
+@Deprecated('Use AutoLeadingButton() instead')
 class AutoBackButton extends StatefulWidget {
   final Color? color;
   final bool showIfParentCanPop;
@@ -18,6 +18,7 @@ class AutoBackButton extends StatefulWidget {
   State<AutoBackButton> createState() => _AutoBackButtonState();
 }
 
+@Deprecated('Use AutoLeadingButton() instead')
 class _AutoBackButtonState extends State<AutoBackButton> {
   late final PagelessRoutesObserver _pagelessRoutesObserver;
 

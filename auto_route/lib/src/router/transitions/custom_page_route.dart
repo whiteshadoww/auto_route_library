@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AutoPageRouteBuilder<T> extends PageRoute<T> {
@@ -6,8 +5,8 @@ class AutoPageRouteBuilder<T> extends PageRoute<T> {
     this.transitionBuilder,
     this.transitionDuration = const Duration(milliseconds: 300),
     required this.child,
-    this.fullscreenDialog = false,
-  });
+    bool fullscreenDialog = false,
+  }) : super(fullscreenDialog: fullscreenDialog);
 
   final RouteTransitionsBuilder? transitionBuilder;
   final Widget child;
@@ -17,9 +16,6 @@ class AutoPageRouteBuilder<T> extends PageRoute<T> {
 
   @override
   String? get barrierLabel => null;
-
-  @override
-  final bool fullscreenDialog;
 
   @override
   Widget buildPage(BuildContext context, Animation<double> animation,
